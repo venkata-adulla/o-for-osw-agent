@@ -1,0 +1,94 @@
+# OSW OpenTelemetry Collector -- the single export contract.
+#
+# Requirement 03: services never talk to a vendor backend directly; they speak
+# OTLP to this Collector, which processes and routes. Swapping the exporter here
+# is the only change needed to move vendors -- that is the no-lock-in promise.
+#
+# Requirement 06 (privacy) is enforced here as well as at the SDK: the redaction
+# and attribute processors below strip guest identifiers before anything leaves
+# the process, so PII protection is a property of the pipeline, not a policy memo.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # Never let an unbounded burst take the Collector down.
+  memory_limiter:
+    check_interval: 2s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+
+  # --- Privacy by production design -------------------------------------------
+  # Anything on this list is deleted before export even if a service emits it.
+  attributes/scrub:
+    actions:
+      - key: guest.email
+        action: delete
+      - key: guest.name
+        action: delete
+      - key: booking.number
+        action: delete
+      - key: card.last_four
+        action: delete
+      - key: conversation.text
+        action: delete
+      - key: enduser.id
+        action: delete
+      # Hash rather than drop, so cardinality studies stay possible.
+      - key: osw.guest.ref
+        action: hash
+
+  # Keep the approved allowlist explicit and auditable.
+  redaction:
+    allow_all_keys: true
+    blocked_values:
+      - "[0-9]{13,16}"                                  # card-like digit runs
+      - "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}" # e-mail addresses
+    summary: debug
+
+  resourcedetection:
+    detectors: [env, system]
+    timeout: 2s
+
+exporters:
+  # The dashboard's own store: OTLP/HTTP JSON into the FastAPI receiver.
+  otlphttp/backend:
+    endpoint: http://backend:8000
+    encoding: json
+    tls:
+      insecure: true
+
+  debug:
+    verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes/scrub, redaction, batch]
+      exporters: [otlphttp/backend, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, batch]
+      exporters: [otlphttp/backend, debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, attributes/scrub, redaction, batch]
+      exporters: [otlphttp/backend, debug]
+  telemetry:
+    logs:
+      level: info

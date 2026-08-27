@@ -1,0 +1,73 @@
+# O for OSW -- one command center: business view + technical view, on open standards.
+#
+# Ports are deliberately offset from the existing osw-agent stack (5432/8000/3000)
+# so both can run side by side on the same machine.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${OSW_PG_DB:-osw_observability}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${OSW_PG_PORT:-5433}:5432"
+    volumes:
+      - osw_pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${OSW_PG_DB:-osw_observability}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Vendor-neutral signal pipeline: services -> OTLP -> Collector -> backend.
+  # This is requirement 03 of the OSW OpenTelemetry contract, running for real.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel/collector-config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"   # OTLP/gRPC
+      - "${OTEL_HTTP_PORT:-4318}:4318"   # OTLP/HTTP
+      - "13133:13133"                    # health_check
+    depends_on:
+      backend:
+        condition: service_started
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${OSW_PG_DB:-osw_observability}
+      OTEL_SERVICE_NAME: osw-observability-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_RESOURCE_ATTRIBUTES: service.version=1.0.0,deployment.environment.name=poc
+      OSW_DATA_ROOT: /data
+    ports:
+      - "${OSW_API_PORT:-8010}:8000"
+    volumes:
+      - ./backend:/app
+      # The real Kore.ai / Zendesk / transcript extracts, read-only.
+      - "../:/data:ro"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${OSW_UI_PORT:-3010}:80"
+    depends_on:
+      - backend
+
+volumes:
+  osw_pgdata:
