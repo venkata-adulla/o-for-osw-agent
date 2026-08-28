@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     postgres_user: str = "osw"
     postgres_password: str = ""
     postgres_pool_max: int = 25
+    # "prefer" tries SSL first and falls back to plain if the server doesn't
+    # offer it -- works unmodified against the local docker-compose Postgres
+    # (no SSL configured) and against a managed one that requires it (Render,
+    # Neon, ...), which otherwise refuses a plain connection outright.
+    postgres_sslmode: str = "prefer"
 
     # --- Kore.ai (reused from the existing stack) ---------------------------
     kore_host: str = "https://bots.kore.ai"
@@ -42,7 +47,7 @@ class Settings(BaseSettings):
         return (
             f"host={self.postgres_host} port={self.postgres_port} "
             f"dbname={self.postgres_db} user={self.postgres_user} "
-            f"password={self.postgres_password}"
+            f"password={self.postgres_password} sslmode={self.postgres_sslmode}"
         )
 
 
