@@ -193,6 +193,14 @@ export default function GuestJourney() {
         <Async query={chain} skeletonRows={6}>
           {(data) => {
             const stages = data.stages ?? [];
+            // Stage 1 is the Kore.ai API page shown for scale only, not a real
+            // step a guest passes through -- the bar chart starts from the
+            // actual reviewed sample instead. The "why" text is dropped from
+            // the bars too (still available in the table below for anyone who
+            // wants the detail); the table keeps the full 6-stage chain.
+            const funnelStages = stages
+              .filter((s) => s.stage_no !== 1)
+              .map((s, i) => ({ ...s, why: "", stage_no: i + 1 }));
             const rows: ChainTableRow[] =
               data.table_rows ??
               stages.map((s) => ({
@@ -204,7 +212,7 @@ export default function GuestJourney() {
               }));
             return (
               <div className="stack">
-                <Funnel stages={stages} />
+                <Funnel stages={funnelStages} />
                 {data.callouts?.length ? <Callouts items={data.callouts} /> : null}
                 <TableToggle label="Show the chain as a table">
                   <DataTable
