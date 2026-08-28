@@ -50,10 +50,7 @@ export default function Products() {
         lede="Which flow does the guest need? One flow per ticket — and one flow does almost all of the work."
       />
 
-      <SectionRule
-        title="What guests come to us about"
-        note="one flow per ticket · 25 of 100 conversations carry none"
-      />
+      <SectionRule title="What guests come to us about" note="one flow per ticket" />
       <Panel
         title="What guests come to us about"
         question="Which flow does the guest need?"

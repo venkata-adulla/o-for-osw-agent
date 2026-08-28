@@ -89,8 +89,13 @@ _WORKFLOW_LABEL = {
 # (trace_id, conversation_id, ticket_ref, workflow, outcome, status, label,
 #  duration_ms, started_at)
 _NAMED_TRACES: list[tuple[str, str, str | None, str, str, str, str, int, datetime]] = [
+    # 2997, not 2840 -- the root duration must cover its own children: the
+    # last span (s7) starts at offset 2599 and runs 398ms, ending at 2997.
+    # Every span here is back-to-back with zero gaps (each starts exactly
+    # when the previous ends), so 2997 is the one value consistent with the
+    # spans actually laid out below, not a value independently re-typed.
     ("7fd3a91c", "conv_8a2f", "ZD-348211", "product_return", "success", "OK",
-     "Return request - document attached", 2840, _t(14, 31, 8)),
+     "Return request - document attached", 2997, _t(14, 31, 8)),
     ("0be42f76", "conv_8a2f", None, "billing_inquiry", "success", "OK",
      "Billing inquiry - resolved", 1180, _t(14, 30, 44)),
     ("a9c0772d", "conv_71b0", "ZD-348208", "product_return", "error", "ERROR",
@@ -110,7 +115,7 @@ _NAMED_TRACES: list[tuple[str, str, str | None, str, str, str, str, int, datetim
 # is not itself a span here).
 _TRACE_7FD3A91C_SPANS: list[tuple[str, str, str, int | None, int, int, str]] = [
     # (span_id, service_name, operation, hop_no, start_offset_ms, duration_ms, status)
-    ("7fd3a91c-root", "kore-dialog", "osw.return_request", None, 0, 2840, "OK"),
+    ("7fd3a91c-root", "kore-dialog", "osw.return_request", None, 0, 2997, "OK"),
     ("7fd3a91c-s2", "kore-dialog", "dialog.process", 2, 0, 711, "OK"),
     ("7fd3a91c-s3", "osw-orchestrator", "POST /requests", 3, 711, 244, "OK"),
     ("7fd3a91c-s4", "zendesk-adapter", "zendesk.ticket.create", 4, 955, 451, "OK"),

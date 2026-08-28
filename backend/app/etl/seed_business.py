@@ -192,7 +192,10 @@ _JOURNEY_STAGES: list[tuple[int, str, str, int, float | None, int | None, str, s
 ]
 
 _QUIT_REASONS: list[tuple[str, str, int, str]] = [
-    ("never_spoke_at_all", "Never spoke at all", 5, "never_spoke"),
+    # 3, not 5 -- matches both the funnel's stage-3 "lost_here" and the
+    # _DAY_BREAKDOWN never-spoke column below, which are cross-checked
+    # against each other by design (see the comment on _DAY_BREAKDOWN).
+    ("never_spoke_at_all", "Never spoke at all", 3, "never_spoke"),
     ("end_of_flow_no_confirm", "End of flow, no confirm", 3, "other"),
     ("attachment_upload", "Attachment upload", 2, "paperwork"),
     ("cabin_number", "Cabin number", 2, "paperwork"),
@@ -295,7 +298,7 @@ _BUSINESS_KPIS: list[tuple[str, str, str, str, str, str, str, int]] = [
      "P-01", 1),
     ("guests_served", "Guests served", "26", "", "26 distinct - sessions only",
      "Distinct people in the session page. Repeat contact is measured on tickets, not "
-     "sessions - see Customers, where 15 guests came back. Kore.ai also reports 0 users "
+     "sessions - see Customers, where 4 guests came back. Kore.ai also reports 0 users "
      "on 14 Aug while returning 28 sessions that day, so treat 26 as a floor.",
      "P-04", 2),
     ("requests_raised", "Requests raised", "7", "", "7% of conversations",
