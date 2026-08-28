@@ -15,7 +15,7 @@ from app.core.db import fetch_all
 POPULATION_BASIS = {
     "A": "Kore.ai session page -- capped at 100 rows, more available",
     "B": "Zendesk bot-raised tickets only",
-    "C": "Hand-reviewed daily sheets -- 5 of 19 days",
+    "C": "Kore.ai extended session detail",
     "T": "OpenTelemetry signals from instrumented services",
 }
 

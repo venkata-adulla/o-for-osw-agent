@@ -61,8 +61,11 @@ processors:
 
 exporters:
   # The dashboard's own store: OTLP/HTTP JSON into the FastAPI receiver.
+  # BACKEND_ORIGIN defaults to the docker-compose service name; Render (or
+  # any other host) overrides it with the backend's real public URL via the
+  # Collector's native ${env:...} substitution -- no template file needed.
   otlphttp/backend:
-    endpoint: http://backend:8000
+    endpoint: ${env:BACKEND_ORIGIN:-http://backend:8000}
     encoding: json
     tls:
       insecure: true

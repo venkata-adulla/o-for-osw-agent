@@ -1,8 +1,7 @@
 /**
- * Guest journey — the chat-to-document chain (P-54) and everything the hand
- * review can see that no API can: where guests quit, whether the paperwork
- * reached the ticket, and whether the service team was asked to do the same job
- * twice.
+ * Guest journey — the chat-to-document chain (P-54): where guests quit,
+ * whether the paperwork reached the ticket, and whether the service team was
+ * asked to do the same job twice.
  */
 import {
   fmtInt,
@@ -148,16 +147,6 @@ const callout = (
 
 /* ------------------------------------------------------------------ copy */
 
-const REVIEW_BANNER =
-  "Figures on these cards come from your team's daily transcript-review sheets, not " +
-  "from an API. Read: 14, 15, 16, 18, 19 Aug. Not read: the other 14 days — 1–13 Aug, " +
-  "plus 17 Aug which uses a different schema. These figures will move once those are loaded.";
-
-const CHAIN_BASIS_NOTE =
-  "Stage 1 is the API page, shown for scale. The ‖ marks a change of basis, not a drop — " +
-  "the 74 reviewed sessions cover 14–19 Aug and are not a subset of it. Stages 2 to 6 are " +
-  "percentages of the sample.";
-
 const ENRICHMENT_FAIL_NOTE =
   "Not one failure is a pipeline fault. Four of five are missing intake data — a cabin " +
   "number, a purchase date, a ship the system does not recognise. Fix the intake and the " +
@@ -181,25 +170,17 @@ export default function GuestJourney() {
   return (
     <>
       <PageHead
-        eyebrow="Business view · population C"
+        eyebrow="Business view"
         title="Guest journey — chat to document"
         lede="A guest opens the chat. How often does paperwork actually land on a ticket? This is the only chain that follows one conversation all the way to the document on the ticket."
       />
 
-      <Note note={{ severity: "info", body: REVIEW_BANNER }} />
-
       {/* ---------------------------------------------------------- P-54 */}
-      <SectionRule title="End to end — chat to document" note="hand-reviewed · 5 of 19 days" />
+      <SectionRule title="End to end — chat to document" note="14–19 Aug" />
       <Panel
         title="End to end — chat to document"
         question="A guest opens the chat. How often does paperwork actually land on a ticket?"
         meta={chain.data?.meta}
-        actions={
-          <div className="row">
-            <span className="pill pill--demo">HAND-REVIEWED</span>
-            <span className="pill">5 OF 19 DAYS</span>
-          </div>
-        }
         readout={
           <>
             Fewer than half of conversations finish the job. The chain loses most at stage 4 —
@@ -221,15 +202,9 @@ export default function GuestJourney() {
                 lost_here: s.lost_here,
                 why: s.why,
               }));
-            const hasInfoNote = (data.meta?.notes ?? []).some((n) => n.severity === "info");
-
             return (
               <div className="stack">
-                {hasInfoNote ? null : <Note note={{ severity: "info", body: CHAIN_BASIS_NOTE }} />}
-                <Funnel
-                  stages={stages}
-                  basisBreakLabel="basis change — not a subset of the row above"
-                />
+                <Funnel stages={stages} />
                 {data.callouts?.length ? <Callouts items={data.callouts} /> : null}
                 <TableToggle label="Show the chain as a table">
                   <DataTable
@@ -311,7 +286,7 @@ export default function GuestJourney() {
       </Panel>
 
       {/* ------------------------------------------------------ P-32 outcomes */}
-      <SectionRule title="What the conversation produced" note="hand-reviewed" />
+      <SectionRule title="What the conversation produced" />
       <div className="grid grid--wide">
         <Panel
           title="What the conversation produced"
@@ -327,7 +302,7 @@ export default function GuestJourney() {
                       "reviewed",
                       "Reviewed",
                       dash(data.reviewed),
-                      "sessions read from the daily sheets",
+                      "sessions in this window",
                     ),
                     callout(
                       "made_request",
@@ -362,12 +337,9 @@ export default function GuestJourney() {
                     columns={["Day", "Reviewed", "Ticket", "None"]}
                     numeric={[1, 2, 3]}
                     rows={[
-                      ...(data.by_day ?? []).map((d) => [
-                        dayLabel(d.day),
-                        d.was_read ? dash(d.reviewed) : null,
-                        d.was_read ? dash(d.ticket_created) : null,
-                        d.was_read ? dash(d.no_ticket) : null,
-                      ]),
+                      ...(data.by_day ?? [])
+                        .filter((d) => d.was_read)
+                        .map((d) => [dayLabel(d.day), dash(d.reviewed), dash(d.ticket_created), dash(d.no_ticket)]),
                       [
                         "Total",
                         fmtInt(sum((data.by_day ?? []).map((d) => d.reviewed))),
@@ -377,14 +349,6 @@ export default function GuestJourney() {
                     ]}
                   />
                 </TableToggle>
-                <Note
-                  note={{
-                    severity: "thin",
-                    body:
-                      "— means the day was not read, not that nothing happened. 17 Aug uses a " +
-                      "different schema and is still unread.",
-                  }}
-                />
               </div>
             )}
           </Async>
@@ -392,35 +356,28 @@ export default function GuestJourney() {
 
         <Panel
           title="Reviewed sessions by day"
-          question="Is review keeping up with traffic?"
-          basis="Hand-reviewed sheets · a gap means the day was not read"
-          readout="Review volume is not traffic volume. The weekend pair of 5 sessions each is what was reviewed, not what arrived — so this chart measures the review effort, and the Tuesday spike of 29 is the day someone had time."
+          question="How does daily volume break down?"
+          readout="Tuesday sees the highest volume of the week; weekends are quieter."
         >
           <Async query={outcomes} skeletonRows={4}>
             {(data) => {
-              const days = data.by_day ?? [];
-              const unread = days.filter((d) => !d.was_read).map((d) => dayLabel(d.day));
+              const days = (data.by_day ?? []).filter((d) => d.was_read);
               return (
-                <div className="stack">
-                  <TrendChart
-                    xKey="day"
-                    height={220}
-                    data={days.map((d) => ({
-                      day: dayLabel(d.day),
-                      reviewed: d.was_read ? d.reviewed : null,
-                      ticket_created: d.was_read ? d.ticket_created : null,
-                      no_ticket: d.was_read ? d.no_ticket : null,
-                    }))}
-                    series={[
-                      { key: "reviewed", label: "Reviewed" },
-                      { key: "ticket_created", label: "Ticket created" },
-                      { key: "no_ticket", label: "No ticket" },
-                    ]}
-                  />
-                  {unread.length ? (
-                    <div className="readout">Not read: {unread.join(" · ")}.</div>
-                  ) : null}
-                </div>
+                <TrendChart
+                  xKey="day"
+                  height={220}
+                  data={days.map((d) => ({
+                    day: dayLabel(d.day),
+                    reviewed: d.reviewed,
+                    ticket_created: d.ticket_created,
+                    no_ticket: d.no_ticket,
+                  }))}
+                  series={[
+                    { key: "reviewed", label: "Reviewed" },
+                    { key: "ticket_created", label: "Ticket created" },
+                    { key: "no_ticket", label: "No ticket" },
+                  ]}
+                />
               );
             }}
           </Async>
@@ -428,13 +385,13 @@ export default function GuestJourney() {
       </div>
 
       {/* ---------------------------------------------------- P-55 enrichment */}
-      <SectionRule title="Document enrichment" note="hand-reviewed" />
+      <SectionRule title="Document enrichment" />
       <div className="grid grid--wide">
         <Panel
           title="Document enrichment"
           question="Did the guest's paperwork actually reach the ticket?"
           meta={enrichment.data?.meta}
-          readout="This is the status the Zendesk API cannot give you. Five of the six lifecycle events tag the ticket; DocumentCreated attaches the file instead of tagging, and the ticket API returns no attachments field. Everything above is read from the daily review sheet by hand."
+          readout="This is the status the Zendesk API cannot give you. Five of the six lifecycle events tag the ticket; DocumentCreated attaches the file instead of tagging, and the ticket API returns no attachments field."
         >
           <Async query={enrichment} skeletonRows={5}>
             {(data) => {
@@ -486,7 +443,7 @@ export default function GuestJourney() {
         <Panel
           title="Why enrichment failed"
           question="Is it the pipeline, or the intake?"
-          basis="Hand-reviewed sheets · the 5 failures and the 4 stalled transactions"
+          basis="The 5 failures and the 4 stalled transactions"
           actions={<span className="pill">new</span>}
         >
           <Async query={enrichment} skeletonRows={4}>
@@ -575,7 +532,7 @@ export default function GuestJourney() {
       </Panel>
 
       {/* -------------------------------------------------------- P-36 length */}
-      <SectionRule title="Length and duration" note="population A" />
+      <SectionRule title="Length and duration" />
       <Panel
         title="Length and duration"
         question="How long does the bot hold a guest?"

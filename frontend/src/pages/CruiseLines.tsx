@@ -47,7 +47,7 @@ export default function CruiseLines() {
   return (
     <>
       <PageHead
-        eyebrow="Business view · population B"
+        eyebrow="Business view"
         title="Cruise lines & ships"
         lede="Which partners generate the most guest contact — and how happy those guests are when they reach us."
       />

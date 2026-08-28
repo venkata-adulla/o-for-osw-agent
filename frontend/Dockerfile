@@ -17,5 +17,11 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Placed under /etc/nginx/templates/ (not conf.d/ directly) so the base
+# image's own entrypoint step envsubst's BACKEND_ORIGIN into it at container
+# start -- see nginx.conf.template's own comment for why.
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+# docker-compose's own network name; Render (or any other host) overrides
+# this with the backend's real public URL, scheme included.
+ENV BACKEND_ORIGIN=http://backend:8000
 EXPOSE 80

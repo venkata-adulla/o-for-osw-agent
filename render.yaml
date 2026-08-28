@@ -1,0 +1,137 @@
+# Render Blueprint for O for OSW.
+#
+# Deploys three free web services from this one repo -- the FastAPI backend,
+# the nginx+React frontend, the OpenTelemetry Collector -- plus a free Render
+# Postgres database.
+#
+# IMPORTANT -- Render's free Postgres self-destructs 30 days after creation
+# (14-day grace period, then the database and all its data are permanently
+# deleted, active or not). This blueprint uses it anyway, by choice, because
+# keeping everything on one platform was worth more than the DB living
+# forever. In practice that means: roughly every 30 days, this "New +" ->
+# "Blueprint" deploy needs re-running (Render will recreate the expired
+# database with a fresh one under the same name), and the ETL then needs a
+# fresh run against it -- either wait for the scheduler's next automatic
+# pass, or trigger one by redeploying the backend service. Put a calendar
+# reminder on this; nothing here does it automatically.
+#
+# IMPORTANT -- read before deploying: the backend's ETL reads raw Kore.ai/
+# Zendesk export files from a folder mounted outside the repo (see
+# docker-compose.yml's `../:/data:ro`). Render's free web services have no
+# host filesystem to mount and no persistent disk, so that mount has no
+# equivalent here. Until you resolve that (see the two options in the chat
+# response this file came with), the deployed backend will start and serve
+# the API, but the ETL will find no raw extracts and the dashboard will show
+# empty/near-empty data -- it will NOT crash, just look sparse.
+#
+# Deploy: push this file to the repo root, then in the Render dashboard use
+# "New +" -> "Blueprint" and point it at this repo.
+
+databases:
+  - name: o-for-osw-postgres
+    plan: free
+    databaseName: osw_observability
+    user: osw
+
+services:
+  # ---------------------------------------------------------------------
+  # OpenTelemetry Collector -- deploy first; the backend needs its URL.
+  # ---------------------------------------------------------------------
+  - name: o-for-osw-otel-collector
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./otel/Dockerfile
+    dockerContext: ./otel
+    autoDeployTrigger: commit
+    envVars:
+      # Render routes public HTTPS traffic to whatever port you tell it to.
+      # The Collector's OTLP/HTTP receiver listens on 4318 (see
+      # collector-config.yaml) -- gRPC's 4317 is not used by this app and
+      # isn't exposed here.
+      - key: PORT
+        value: "4318"
+      # Paste the backend service's own https://...onrender.com URL here
+      # AFTER its first deploy (Render assigns the URL once the service
+      # exists) -- see the wiring step in the chat response. Deliberately
+      # manual rather than `fromService`, so the value is always the exact
+      # https:// URL these files expect, with no ambiguity about format.
+      - key: BACKEND_ORIGIN
+        sync: false
+
+  # ---------------------------------------------------------------------
+  # FastAPI backend
+  # ---------------------------------------------------------------------
+  - name: o-for-osw-backend
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeployTrigger: commit
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: OTEL_SERVICE_NAME
+        value: osw-observability-api
+      - key: OTEL_PROPAGATORS
+        value: tracecontext,baggage
+      - key: OTEL_RESOURCE_ATTRIBUTES
+        value: service.version=1.0.0,deployment.environment.name=render
+      # Paste the collector service's own https://...onrender.com URL here
+      # AFTER its first deploy. Manual for the same reason as BACKEND_ORIGIN
+      # above -- the OTel SDK needs the exact https:// URL, not a bare host.
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      # --- Postgres -- Render's own free DB, see the expiry warning above ---
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: o-for-osw-postgres
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: o-for-osw-postgres
+          property: port
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: o-for-osw-postgres
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: o-for-osw-postgres
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: o-for-osw-postgres
+          property: password
+      - key: POSTGRES_POOL_MAX
+        value: "25"
+      # --- ETL scheduling ---
+      - key: PIPELINE_CRON
+        value: "*/10 * * * *"
+      - key: ETL_SCHEDULER_ENABLED
+        value: "true"
+      # --- Raw extracts: unresolved, see the caveat at the top of this file ---
+      - key: OSW_DATA_ROOT
+        value: /data
+
+  # ---------------------------------------------------------------------
+  # Frontend (nginx + built React bundle)
+  # ---------------------------------------------------------------------
+  - name: o-for-osw-frontend
+    type: web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: "80"
+      # Paste the backend service's own https://...onrender.com URL here
+      # AFTER its first deploy. nginx proxies /api/ and /health to it at
+      # container start (see nginx.conf.template) -- restart this service
+      # (no rebuild needed) if the backend's URL ever changes.
+      - key: BACKEND_ORIGIN
+        sync: false

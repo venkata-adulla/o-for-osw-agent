@@ -316,7 +316,6 @@ button { font: inherit; color: inherit; }
   background: var(--good);
   animation: pulse 2.4s ease-in-out infinite;
 }
-.pill--demo { background: var(--warning-wash); color: #8a6410; }
 .pill--spec { background: var(--accent-wash); color: var(--accent-ink); }
 
 @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }

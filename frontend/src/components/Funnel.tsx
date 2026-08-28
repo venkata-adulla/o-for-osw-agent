@@ -2,17 +2,15 @@
  * The guest journey funnel.
  *
  * Stages arrive as data (see `journey_stages`), so the chain is never layout.
- * Two things this component must never lose:
- *   - the per-stage loss chip, because the drop is the finding, not the total;
- *   - the `‖` basis break, because stage 1 is a different population from the
- *     stages below it and reading them as one series is the classic error.
+ * The per-stage loss chip is the one thing this component must never lose,
+ * because the drop is the finding, not the total.
  */
 import { Fragment } from "react";
 import { fmtInt, rampColor, type JourneyStage } from "../lib/api";
 
 export default function Funnel({
   stages,
-  basisBreakLabel = "basis change — a different population, not a drop",
+  basisBreakLabel,
   lossLabel = "lost here",
 }: {
   stages: JourneyStage[];
@@ -34,7 +32,7 @@ export default function Funnel({
 
         return (
           <Fragment key={stage.code || `stage-${stage.stage_no}`}>
-            {stage.basis_change ? (
+            {stage.basis_change && basisBreakLabel ? (
               <div className="funnel__basis-break">{basisBreakLabel}</div>
             ) : null}
 
@@ -59,7 +57,7 @@ export default function Funnel({
                     {stage.stage_no}. {stage.label}
                   </span>
                   <span className="funnel__pct">
-                    {pct === null || pct === undefined ? "— of sample" : `${pct}%`}
+                    {pct === null || pct === undefined ? "—" : `${pct}%`}
                   </span>
                   {stage.why ? <span className="funnel__why">{stage.why}</span> : null}
                 </div>

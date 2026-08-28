@@ -1,7 +1,12 @@
 # Serves the built SPA and proxies the backend on the SAME origin, so the
 # bundle never needs an absolute API host baked in -- it works identically at
-# http://localhost:3010 and behind any public tunnel/domain pointed at this
-# container's port 80.
+# http://localhost:3010, behind any public tunnel/domain, or on a host like
+# Render where the backend is a separate service reachable only by its own
+# public URL. BACKEND_ORIGIN (full origin, scheme included -- e.g.
+# "http://backend:8000" for docker-compose or "https://x.onrender.com" on
+# Render) is substituted in at container start by the base nginx image's
+# built-in envsubst-on-templates entrypoint step: this file lives at
+# /etc/nginx/templates/default.conf.template, so nothing extra runs it.
 server {
     listen 80;
     root /usr/share/nginx/html;
@@ -10,7 +15,7 @@ server {
     # forward the matched sub-path onto the same sub-path upstream instead of
     # replacing the whole path with the proxy_pass URL.
     location /api/ {
-        proxy_pass http://backend:8000/api/;
+        proxy_pass ${BACKEND_ORIGIN}/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -18,7 +23,7 @@ server {
     }
 
     location /health {
-        proxy_pass http://backend:8000/health;
+        proxy_pass ${BACKEND_ORIGIN}/health;
         proxy_set_header Host $host;
     }
 

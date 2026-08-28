@@ -94,7 +94,7 @@ export default function ConversationDetail() {
   return (
     <>
       <PageHead
-        eyebrow="Business view · population A"
+        eyebrow="Business view"
         title={`Session ${sessionId ?? ""}`}
         lede="One guest chat, turn by turn — and the traces that carried it across the services."
       />

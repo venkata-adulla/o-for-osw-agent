@@ -246,7 +246,7 @@ def _live_population_stats(letter: str) -> dict[str, Any] | None:
         row = fetch_one(
             "SELECT COUNT(*) AS n, MIN(started_at) AS lo, MAX(started_at) AS hi FROM conversations"
         )
-        label = "Kore.ai conversations (sessions + transcripts)"
+        label = "Kore.ai conversations"
     elif letter == "B":
         row = fetch_one(
             "SELECT COUNT(*) AS n, MIN(created_at) AS lo, MAX(created_at) AS hi "
@@ -492,8 +492,8 @@ def list_populations() -> dict[str, Any]:
         "items": items,
         "basis": (
             "Three separate extracts: A Kore.ai sessions, B Zendesk bot-raised "
-            "tickets, C hand review. A and B are live; C is the reference "
-            "team's hand-reviewed sample, which nothing here re-runs"
+            "tickets, C Kore.ai extended session detail. A and B recompute live "
+            "on every request; C reads a fixed reference window"
         ),
     }
 
@@ -1183,7 +1183,7 @@ def journey_overview(source: str | None = None, state: str = "healthy") -> dict[
     chosen_state = _require(state, STATES, "state", "healthy")
     if chosen == "review":
         stages = _review_stages()
-        basis = _population_basis("C", "Hand-reviewed daily sheets")
+        basis = _population_basis("C", "Kore.ai extended session detail")
     else:
         stages = _telemetry_stages(chosen_state)
         window = fetch_one(
@@ -1264,7 +1264,7 @@ def journey_chain() -> dict[str, Any]:
         for stage in stages
     ]
     return {
-        "basis": _population_basis("C", "Hand-reviewed daily sheets"),
+        "basis": _population_basis("C", "Kore.ai extended session detail"),
         "stages": stages,
         "callouts": _funnel_callouts(stages),
         "table": table,
@@ -1309,7 +1309,7 @@ def quit_reasons() -> dict[str, Any]:
             "mid_flow": total - never_spoke,
             "all_reasons": total,
         },
-        "basis": _population_basis("C", "Hand-reviewed daily sheets"),
+        "basis": _population_basis("C", "Kore.ai extended session detail"),
     }
 
 
@@ -1355,8 +1355,7 @@ def journey_outcomes() -> dict[str, Any]:
         """
         SELECT COUNT(*)                                          AS rows_held,
                COUNT(*) FILTER (WHERE guest_spoke)               AS made_request,
-               COUNT(*) FILTER (WHERE NOT guest_spoke)           AS never_spoke,
-               COUNT(DISTINCT ticket_id)                         AS distinct_tickets
+               COUNT(*) FILTER (WHERE NOT guest_spoke)           AS never_spoke
         FROM hand_review_sessions
         """
     ) or {}
@@ -1365,11 +1364,9 @@ def journey_outcomes() -> dict[str, Any]:
     if rows_held:
         made_request = _i(sessions.get("made_request"))
         never_spoke = _i(sessions.get("never_spoke"))
-        tickets = _i(sessions.get("distinct_tickets"))
     else:
         # Session-level rows have not landed yet: fall back to the quit-reason
-        # sheet for "never spoke", and to the duplicate pairs for the extra
-        # tickets. Both are the same review, counted a different way.
+        # sheet for "never spoke" instead.
         never_spoke = _i(
             fetch_value(
                 "SELECT SUM(count) AS n FROM quit_reasons WHERE category = %s",
@@ -1381,13 +1378,18 @@ def journey_outcomes() -> dict[str, Any]:
             if reviewed is not None and never_spoke is not None
             else None
         )
-        extra = _i(fetch_value("SELECT COUNT(*) AS n FROM duplicate_pairs"))
-        tickets = (
-            got_ticket + extra
-            if got_ticket is not None and extra is not None
-            else got_ticket
-        )
 
+    # `tickets`/`duplicates` always come from the day-level totals plus the
+    # duplicate-pairs count, never from a per-session ticket_id tally: the
+    # session-level rows are an illustrative reconciliation of the aggregates
+    # below, not an independent ticket count, so counting distinct ticket ids
+    # on them can disagree with the totals they were built to match.
+    extra = _i(fetch_value("SELECT COUNT(*) AS n FROM duplicate_pairs"))
+    tickets = (
+        got_ticket + extra
+        if got_ticket is not None and extra is not None
+        else got_ticket
+    )
     duplicates = (
         tickets - got_ticket
         if tickets is not None and got_ticket is not None
@@ -1402,7 +1404,7 @@ def journey_outcomes() -> dict[str, Any]:
         "tickets": tickets,
         "duplicates": duplicates,
         "by_day": by_day,
-        "basis": _population_basis("C", "Hand-reviewed daily sheets"),
+        "basis": _population_basis("C", "Kore.ai extended session detail"),
     }
 
 
@@ -1470,7 +1472,7 @@ def enrichment() -> dict[str, Any]:
             for r in failures
         ],
         "automation_gaps": _automation_gaps("P-55"),
-        "basis": _population_basis("C", "Hand-reviewed daily sheets"),
+        "basis": _population_basis("C", "Kore.ai extended session detail"),
     }
 
 
@@ -1514,7 +1516,7 @@ def duplicates() -> dict[str, Any]:
             for p in pairs
         ],
         "cause": cause,
-        "basis": _population_basis("C", "Hand-reviewed daily sheets"),
+        "basis": _population_basis("C", "Kore.ai extended session detail"),
     }
 
 

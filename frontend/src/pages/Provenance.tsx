@@ -41,15 +41,14 @@ interface CoverageItem {
   label: string;
   numerator: number;
   denominator: number;
-  pct: number;
+  pct: number | null;
   basis: string;
 }
 
 const PERIOD_TOTAL_WARNING =
   "No figure on this screen is a period total. Zendesk reports 345 tickets and we hold 100 " +
-  "of them. Kore.ai reports more sessions available beyond its 100. The review covers 5 days " +
-  "of 19. Every count here is a floor, and every percentage is computed inside its own page — " +
-  "never across the three.";
+  "of them. Kore.ai reports more sessions available beyond its 100. Every count here is a " +
+  "floor, and every percentage is computed inside its own page — never across extracts.";
 
 const INTRO =
   "Three separate extracts. Both APIs cap at 100, so the two 100s below are a coincidence, not a match.";
@@ -66,6 +65,9 @@ const windowText = (population: Population): string => {
     : ` · ${fmtInt(population.row_count)} rows held`;
   return `${population.source_system} · ${range}${rows}${cap}`;
 };
+
+const pctText = (pct: number | null | undefined): string =>
+  pct === null || pct === undefined ? "—" : `${pct}%`;
 
 const coverageColor = (pct: number): string => {
   if (pct >= 95) return "var(--good)";
@@ -86,7 +88,7 @@ export default function Provenance() {
         lede={INTRO}
       />
 
-      <SectionRule title="Three populations" note="A · Kore.ai  B · Zendesk  C · Hand review" />
+      <SectionRule title="Three populations" note="A · Kore.ai  B · Zendesk  C · Extended detail" />
 
       <Async query={populations} skeletonRows={4}>
         {(data) => (
@@ -150,13 +152,13 @@ export default function Provenance() {
                         <div
                           className="bar__fill"
                           style={{
-                            width: `${Math.max(0, Math.min(100, item.pct))}%`,
-                            background: coverageColor(item.pct),
+                            width: `${Math.max(0, Math.min(100, item.pct ?? 0))}%`,
+                            background: coverageColor(item.pct ?? 0),
                           }}
                         />
                       </div>
                       <div className="bar__value">
-                        {item.pct}%
+                        {pctText(item.pct)}
                         <span className="bar__pct">
                           {fmtInt(item.numerator)}/{fmtInt(item.denominator)}
                         </span>
@@ -170,7 +172,7 @@ export default function Provenance() {
                   numeric={[1]}
                   rows={items.map((item) => [
                     item.label,
-                    `${item.pct}%`,
+                    pctText(item.pct),
                     item.basis || `${fmtInt(item.numerator)} of ${fmtInt(item.denominator)}`,
                   ])}
                 />

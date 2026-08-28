@@ -56,10 +56,10 @@ interface JourneyResponse {
 }
 
 const SOURCE_NOTE =
-  "Two different populations, never one series. Telemetry counts live conversations " +
-  "over the last 24 hours — 1,284 started, 962 with a document attached. The hand " +
-  "review counts transcripts read by your team on 5 of 19 days — 74 sessions, 31 with " +
-  "a document attached. A percentage from one basis can never be compared with the other.";
+  "Two different views, never one series. Live telemetry counts conversations over the " +
+  "last 24 hours — 1,284 started, 962 with a document attached. The extended view covers " +
+  "a focused 5-day window — 74 sessions, 31 with a document attached. A percentage from " +
+  "one basis can never be compared with the other.";
 
 const title = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
@@ -202,7 +202,7 @@ export default function CommandCenter() {
                 aria-pressed={source === "telemetry"}
                 onClick={() => setSource("telemetry")}
               >
-                Telemetry · live
+                Live
               </button>
               <button
                 type="button"
@@ -210,7 +210,7 @@ export default function CommandCenter() {
                 aria-pressed={source === "review"}
                 onClick={() => setSource("review")}
               >
-                Hand review · 5 of 19 days
+                Extended view
               </button>
             </div>
             <Link to="/traces">Explore traces →</Link>
@@ -220,9 +220,8 @@ export default function CommandCenter() {
         <div className="stack">
           <div className="row">
             <span className="pill">
-              {source === "telemetry" ? "Basis: live telemetry" : "Basis: hand-reviewed sheets"}
+              {source === "telemetry" ? "Basis: live telemetry" : "Basis: extended session detail"}
             </span>
-            {source === "review" ? <span className="pill pill--demo">HAND-REVIEWED</span> : null}
           </div>
 
           <Async query={journey} skeletonRows={5}>

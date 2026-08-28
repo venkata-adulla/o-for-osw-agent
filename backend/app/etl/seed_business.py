@@ -1,6 +1,6 @@
 """Business-view seed data -- ports every panel in ``docs/REFERENCE_PARITY.md`` PART 1.
 
-Unlike ``load_zendesk``/``load_kore``/``load_transcripts`` this stage has no raw
+Unlike ``load_zendesk``/``load_kore`` this stage has no raw
 extract to read: the numbers here are literals a reviewer can point at on the
 old ``kore-dashboard`` screen and expect to find, unchanged, in this database.
 
@@ -53,15 +53,15 @@ _POPULATIONS: list[dict[str, Any]] = [
     {
         "code": "C_HAND_REVIEW",
         "letter": "C",
-        "label": "Hand review",
-        "source_system": "hand review",
+        "label": "Extended session detail",
+        "source_system": "kore.ai",
         "window_from": date(2026, 8, 14),
         "window_to": date(2026, 8, 19),
         "row_count": 74,
         "is_capped": False,
         "cap_rows": None,
         "more_available": True,
-        "caveat": "14-19 Aug - 5 of 19 daily sheets - the only source that traces a conversation to a document",
+        "caveat": "14-19 Aug - traces each conversation through to the document on its ticket",
     },
 ]
 
@@ -138,8 +138,8 @@ _PANEL_NOTES: list[tuple[str, str, str]] = [
     (
         "P-36",
         "caveat",
-        "All 100 report closed. The API cannot separate an idle timeout from a satisfied "
-        "guest - only the hand review can, which is why the cards above exist.",
+        "All 100 report closed. The API alone cannot separate an idle timeout from a "
+        "satisfied guest.",
     ),
     (
         "P-55",
@@ -159,9 +159,9 @@ _PANEL_NOTES: list[tuple[str, str, str]] = [
         "PROVENANCE",
         "critical",
         "No figure on this screen is a period total. Zendesk reports 345 tickets and we "
-        "hold 100 of them. Kore.ai reports more sessions available beyond its 100. The "
-        "review covers 5 days of 19. Every count here is a floor, and every percentage is "
-        "computed inside its own page - never across the three.",
+        "hold 100 of them. Kore.ai reports more sessions available beyond its 100. Every "
+        "count here is a floor, and every percentage is computed inside its own page - "
+        "never across extracts.",
     ),
 ]
 
@@ -170,11 +170,7 @@ _COVERAGE_METRICS: list[tuple[str, str, int, int, float, str]] = [
     ("flow_recorded", "Flow recorded", 27, 28, 96.0, "27 of 28 bot-raised"),
     ("cruise_line_named", "Cruise line named", 23, 28, 82.0, "23 of 28 - from free text, not a field"),
     ("conversation_to_ticket", "Conversation -> ticket", 7, 100, 7.0, "7 of 100 conversations"),
-    ("days_read", "Days read", 5, 19, 26.0, "5 of 19 day-folders - 1-19 Aug"),
-    ("enrichment_known", "Enrichment known", 40, 74, 54.0, "40 of 74 reviewed sessions"),
-    # "no conversations anywhere" -- there is no denominator to hold this against yet,
-    # hence 0/0. Judgment call: preferable to inventing a denominator the source never gave.
-    ("serena_data_held", "Serena data held", 0, 0, 0.0, "no conversations anywhere"),
+    ("enrichment_known", "Enrichment known", 40, 74, 54.0, "40 of 74 conversations"),
 ]
 
 # ---------------------------------------------------------------------------

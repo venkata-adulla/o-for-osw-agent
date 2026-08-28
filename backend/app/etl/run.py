@@ -5,25 +5,25 @@
 Default (no ``--only``) runs the whole pipeline in the one order that makes
 every foreign key line up:
 
-    seed_business -> seed_telemetry -> zendesk -> kore -> transcripts -> derive_spans
+    seed_business -> seed_telemetry -> zendesk -> kore -> derive_spans
 
 ``seed_business``/``seed_telemetry`` are the literal reference-parity seeds and
-have no dependency on the raw extracts, so they go first. ``zendesk``,
-``kore`` and ``transcripts`` are the three raw-extract loaders: they are
-independent of each other (each keys on its own natural id and only touches
-its own tables plus the shared ``conversations``/``bots`` tables via
-``ON CONFLICT``), so one of them failing must not stop the other two from
-being attempted. ``derive_spans`` runs last because it reads real rows
-``kore`` lands in ``conversations`` and needs the ``services`` rows
-``seed_telemetry`` seeds for its spans' foreign key -- it only runs if
-``kore`` actually succeeded *this run*.
+have no dependency on the raw extracts, so they go first. ``zendesk`` and
+``kore`` are the two raw-extract loaders -- Kore.ai and Zendesk API data only,
+nothing else is in scope. They are independent of each other (each keys on
+its own natural id and only touches its own tables plus the shared
+``conversations``/``bots`` tables via ``ON CONFLICT``), so one of them
+failing must not stop the other from being attempted. ``derive_spans`` runs
+last because it reads real rows ``kore`` lands in ``conversations`` and needs
+the ``services`` rows ``seed_telemetry`` seeds for its spans' foreign key --
+it only runs if ``kore`` actually succeeded *this run*.
 
 Failure handling: every stage's own ``run_stage`` context manager already
 writes a ``failed`` row to ``etl_runs`` and re-raises. This CLI lets that
 exception end the run (non-zero exit) unless ``--continue-on-error`` is
-passed -- except for the zendesk/kore/transcripts trio, where all three are
-always attempted regardless of one failing; the run still ends non-zero
-afterwards if any of them failed and ``--continue-on-error`` was not given.
+passed -- except for the zendesk/kore pair, where both are always attempted
+regardless of one failing; the run still ends non-zero afterwards if either
+failed and ``--continue-on-error`` was not given.
 """
 from __future__ import annotations
 
@@ -34,14 +34,13 @@ from typing import Callable
 
 from app.core.db import get_pool
 from app.etl import StageResult, log
-from app.etl import derive_spans, load_kore, load_transcripts, load_zendesk, seed_business, seed_telemetry
+from app.etl import derive_spans, load_kore, load_zendesk, seed_business, seed_telemetry
 
 STAGE_FUNCS: dict[str, Callable[[], StageResult]] = {
     "seed_business": seed_business.run,
     "seed_telemetry": seed_telemetry.run,
     "zendesk": load_zendesk.run,
     "kore": load_kore.run,
-    "transcripts": load_transcripts.run,
     "derive_spans": derive_spans.run,
 }
 
@@ -112,11 +111,11 @@ def run_all(continue_on_error: bool) -> int:
         else:
             total_rows += result.rows  # type: ignore[union-attr]
 
-    # The raw-extract trio: independent of each other, so every one of them is
-    # attempted even if an earlier one in the trio failed. Exceptions are
-    # collected, not raised here, so all three get their chance to run.
+    # The raw-extract pair: independent of each other, so both are attempted
+    # even if one fails. Exceptions are collected, not raised here, so the
+    # other still gets its chance to run.
     kore_ok = False
-    for name in ("zendesk", "kore", "transcripts"):
+    for name in ("zendesk", "kore"):
         result, error = _run_stage(name, STAGE_FUNCS[name])
         if error is not None:
             failed_stages.append(name)
@@ -149,7 +148,7 @@ def run_all(continue_on_error: bool) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m app.etl.run",
-        description="Load/seed the osw schema: reference-parity seeds plus the real Kore.ai/Zendesk/transcript extracts.",
+        description="Load/seed the osw schema: reference-parity seeds plus the real Kore.ai/Zendesk extracts.",
     )
     parser.add_argument(
         "--only",

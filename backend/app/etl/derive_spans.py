@@ -3,7 +3,7 @@
 Everything in ``seed_telemetry.py`` is a literal ported from the reference
 screen. This stage is different: it reads the *real* per-node timing records
 Kore.ai reports (``load_kore.performance_records()``) and the *real* sessions
-``load_kore``/``load_transcripts`` already landed in ``conversations``, and
+``load_kore`` already landed in ``conversations``, and
 turns each real session that has timing data into one ``traces`` row plus one
 ``spans`` row per node execution.
 

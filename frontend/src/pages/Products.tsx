@@ -45,7 +45,7 @@ export default function Products() {
   return (
     <>
       <PageHead
-        eyebrow="Business view · population B"
+        eyebrow="Business view"
         title="Products & services"
         lede="Which flow does the guest need? One flow per ticket — and one flow does almost all of the work."
       />

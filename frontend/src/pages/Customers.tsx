@@ -58,7 +58,7 @@ export default function Customers() {
   return (
     <>
       <PageHead
-        eyebrow="Business view · population B"
+        eyebrow="Business view"
         title="Customers"
         lede="How often does one guest have to ask the bot twice?"
       />

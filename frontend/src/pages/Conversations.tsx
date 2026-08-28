@@ -89,7 +89,7 @@ export default function Conversations() {
   return (
     <>
       <PageHead
-        eyebrow="Business view · population A"
+        eyebrow="Business view"
         title="Conversations"
         lede="Every session in the extract. Open one to read the transcript and follow it into the trace behind it."
       />

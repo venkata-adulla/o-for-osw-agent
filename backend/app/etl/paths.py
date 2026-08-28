@@ -10,7 +10,6 @@ on: a partial extract set must still produce a usable database.
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -78,15 +77,6 @@ KORE_CONTAINMENT_FILES: tuple[str, ...] = (
     "Extracts Prod/Containment Report - Poll Status",
 )
 
-# ---------------------------------------------------------------------------
-# Transcripts
-# ---------------------------------------------------------------------------
-TRANSCRIPT_DIR_GLOB = "transcripts-*"
-# transcript-<24-hex sessionId>-<YYYY-MM-DD-HH-MM-SS>.csv
-TRANSCRIPT_NAME_RE = re.compile(
-    r"^transcript-(?P<session>[0-9a-fA-F]{8,32})-(?P<stamp>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})\.csv$"
-)
-
 
 def data_root() -> Path:
     """``/data`` in the container, the repo's parent folder on a developer box."""
@@ -125,35 +115,6 @@ def load_json(relative: str) -> Any | None:
     except (OSError, json.JSONDecodeError) as exc:
         log.warning("could not parse %s: %s", path, exc)
         return None
-
-
-def transcript_files() -> list[Path]:
-    """Every transcript CSV, de-duplicated by file name.
-
-    WHY: each date folder exists twice on disk -- ``transcripts-2026-08-03-17-07-21 (1)``
-    and ``transcripts-2026-08-03-17-07-21 1`` hold byte-identical files. Loading
-    both would double every conversation count, so the first folder in sorted
-    order wins for any given file name. 158 files on disk, 79 conversations.
-    """
-    root = data_root()
-    if not root.is_dir():
-        log.warning("data root %s is not a directory; no transcripts loaded", root)
-        return []
-
-    picked: dict[str, Path] = {}
-    for folder in sorted(root.glob(TRANSCRIPT_DIR_GLOB)):
-        if not folder.is_dir():
-            continue
-        for csv_path in sorted(folder.glob("*.csv")):
-            key = csv_path.name.casefold()
-            if key not in picked:
-                picked[key] = csv_path
-    return [picked[key] for key in sorted(picked)]
-
-
-def session_id_from_transcript(path: Path) -> str | None:
-    match = TRANSCRIPT_NAME_RE.match(path.name)
-    return match.group("session") if match else None
 
 
 def available(relatives: tuple[str, ...]) -> list[str]:

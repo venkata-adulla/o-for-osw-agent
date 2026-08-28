@@ -124,7 +124,7 @@ export default function Tickets() {
   return (
     <>
       <PageHead
-        eyebrow="Business view · population B"
+        eyebrow="Business view"
         title="Tickets & requests"
         lede="What the bot put into the service queue — and whether anyone has picked it up."
       />
