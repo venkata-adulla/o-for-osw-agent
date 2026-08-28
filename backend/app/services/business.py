@@ -644,34 +644,130 @@ def freshness() -> dict[str, Any]:
 # =========================================================================== #
 
 
+def _kpi_tile(
+    code: str,
+    label: str,
+    value_text: str,
+    unit: str,
+    sub_text: str,
+    footnote: str,
+    tone: str = "neutral",
+) -> dict[str, Any]:
+    return {
+        "code": code,
+        "label": label,
+        "value_text": value_text,
+        "unit": unit,
+        "sub_text": sub_text,
+        "delta_text": None,
+        "delta_direction": None,
+        "delta_is_good": None,
+        "tone": tone,
+        "panel_id": "",
+        "footnote": footnote,
+    }
+
+
+def _live_business_kpis() -> list[dict[str, Any]]:
+    """Business-view KPI tiles, computed live from the same queries Tickets,
+    Conversations and Customers already use for the same facts.
+
+    These used to be frozen `kpi_snapshots` rows describing the original
+    ~100-row reference sample. That drifted the moment the real ETL held
+    more than the sample did -- Command Centre kept saying "100 conversations"
+    long after Tickets/Conversations/Provenance correctly said the real,
+    larger number, which is confusing in exactly the way a leadership
+    dashboard can't afford to be. Computing these tiles from the same
+    functions those other pages call means they can never disagree again.
+    """
+    live_a = _live_population_a() or {}
+    summary = ticket_summary()
+    repeats = repeat_guests()
+
+    guests_text = next(
+        (f["value_text"] for f in live_a.get("figures", []) if f["label"] == "GUESTS"), "0"
+    )
+    window_from, window_to = live_a.get("window_from"), live_a.get("window_to")
+    window_text = (
+        f"{_fmt_day(window_from)} - {_fmt_day(window_to)}" if window_from and window_to else ""
+    )
+
+    still = summary.get("still_waiting", {})
+    untouched = _i(still.get("untouched")) or 0
+    bot_raised = _i(summary.get("bot_raised")) or 0
+    requests_pct = summary.get("requests_pct")
+
+    return [
+        _kpi_tile(
+            "conversations",
+            "Conversations",
+            str(live_a.get("row_count") or summary.get("conversations") or 0),
+            "",
+            f"{window_text} - live" if window_text else "Kore.ai session page",
+            live_a.get("caveat")
+            or "Real ETL pull -- Kore.ai's own session API may report more available.",
+        ),
+        _kpi_tile(
+            "guests_served",
+            "Guests served",
+            guests_text,
+            "",
+            f"{guests_text} distinct - sessions only",
+            "Distinct people in the session page. Repeat contact is measured on tickets, not "
+            f"sessions - see Customers, where {_i(repeats.get('repeat_guests')) or 0} guests "
+            "came back.",
+        ),
+        _kpi_tile(
+            "requests_raised",
+            "Requests raised",
+            str(_i(summary.get("requests_raised")) or 0),
+            "",
+            f"{requests_pct}% of conversations" if requests_pct is not None else "of conversations",
+            "Conversations that produced a Zendesk ticket, matched by ticket number.",
+        ),
+        _kpi_tile(
+            "still_waiting",
+            "Still waiting",
+            f"{untouched} of {bot_raised}",
+            "",
+            f"Untouched - {_i(still.get('open')) or 0} open, {_i(still.get('solved')) or 0} solved",
+            still.get("note") or "",
+            "critical" if untouched else "good",
+        ),
+    ]
+
+
 def kpis(view: str | None = None, state: str = "healthy") -> dict[str, Any]:
     """The headline tile strip for one view in one incident state.
 
-    Population: A/B for the business view, T for the technical view. Both
-    states are stored rows rather than client-side arithmetic, so flipping the
-    incident switch moves every page together.
+    Population: A/B for the business view (computed live), T for the
+    technical view (stored rows, since those describe the incident
+    simulation's two fixed healthy/incident states rather than something
+    live-queryable).
     """
     chosen_view = _require(view, VIEWS, "view", "business")
     chosen_state = _require(state, STATES, "state", "healthy")
-    rows = fetch_all(
-        """
-        SELECT code, label, value_text, unit, sub_text, delta_text,
-               delta_direction, delta_is_good, tone, panel_id, footnote
-        FROM kpi_snapshots
-        WHERE view = %s AND state = %s
-        ORDER BY sort_order, id
-        """,
-        (chosen_view, chosen_state),
-    )
-    basis = (
-        f"OpenTelemetry signals, last 24 hours · state {chosen_state}"
-        if chosen_view == "technical"
-        else _population_basis("A")
-    )
+    if chosen_view == "business":
+        items = _live_business_kpis()
+        basis = _population_basis("A")
+    else:
+        items = _rows(
+            fetch_all(
+                """
+                SELECT code, label, value_text, unit, sub_text, delta_text,
+                       delta_direction, delta_is_good, tone, panel_id, footnote
+                FROM kpi_snapshots
+                WHERE view = %s AND state = %s
+                ORDER BY sort_order, id
+                """,
+                (chosen_view, chosen_state),
+            )
+        )
+        basis = f"OpenTelemetry signals, last 24 hours · state {chosen_state}"
     return {
         "view": chosen_view,
         "state": chosen_state,
-        "items": rows,
+        "items": items,
         "basis": basis,
     }
 
