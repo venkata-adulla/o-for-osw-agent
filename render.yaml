@@ -119,7 +119,7 @@ services:
   # ---------------------------------------------------------------------
   # Frontend (nginx + built React bundle)
   # ---------------------------------------------------------------------
-  - name: o-for-osw-frontend
+  - name: o-for-osw
     type: web
     runtime: docker
     plan: free
