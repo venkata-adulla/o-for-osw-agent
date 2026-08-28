@@ -226,11 +226,13 @@ button { font: inherit; color: inherit; }
   position: sticky;
   top: 0;
   z-index: 20;
-  height: var(--header-h);
+  min-height: var(--header-h);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--sp-4);
-  padding: 0 var(--sp-6);
+  row-gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-6);
   background: rgba(242, 245, 245, .86);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--rule);
@@ -241,6 +243,8 @@ button { font: inherit; color: inherit; }
   letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--ink-3);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .topbar__crumb b { color: var(--ink); font-weight: 500; }
 .topbar__spacer { flex: 1; }
@@ -254,7 +258,11 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  min-width: 0;
+  /* Never shrink below the label/value text's own width -- a squeezed
+     control with nowrap text has nowhere to put the overflow except
+     visually on top of its neighbour. The bar wraps a whole control onto
+     the next line instead, which is what "gap"/"row-gap" above are for. */
+  flex-shrink: 0;
 }
 .control:hover { border-color: var(--rule-strong); }
 .control__label {
@@ -309,6 +317,7 @@ button { font: inherit; color: inherit; }
   background: var(--neutral-wash);
   color: var(--ink-2);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .pill--live { background: var(--good-wash); color: var(--good); }
 .pill--live::before {
@@ -335,6 +344,7 @@ button { font: inherit; color: inherit; }
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .btn:hover { border-color: var(--rule-strong); background: var(--surface-sunk); }
 .btn--accent { background: var(--accent); border-color: var(--accent); color: #fff; }

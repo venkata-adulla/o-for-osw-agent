@@ -1894,14 +1894,15 @@ def recent_tickets(
         clause = " AND is_bot_raised = %s"
     sql = (
         """
-        SELECT ticket_id, created_at, status, priority, cruise_line, ship_name,
-               inquiry_type, sentiment, is_bot_raised
-        FROM tickets
+        SELECT t.ticket_id, t.created_at, t.status, t.priority, t.cruise_line, t.ship_name,
+               t.inquiry_type, t.sentiment, t.is_bot_raised, c.session_id
+        FROM tickets t
+        LEFT JOIN conversations c ON c.ticket_id = t.ticket_id
         WHERE 1 = 1
         """
-        + clause
+        + clause.replace("is_bot_raised", "t.is_bot_raised")
         + _range_clause("created_at", date_from, date_to, params)
-        + " ORDER BY created_at DESC NULLS LAST, ticket_id DESC LIMIT %s"
+        + " ORDER BY t.created_at DESC NULLS LAST, t.ticket_id DESC LIMIT %s"
     )
     params.append(capped)
     rows = fetch_all(sql, params)
@@ -2298,9 +2299,10 @@ def repeat_guests(
     top_sql = (
         """
         WITH scoped AS (
-            SELECT requester_id, ticket_id, via_source_rel, created_at
-            FROM tickets
-            WHERE is_bot_raised AND requester_id IS NOT NULL
+            SELECT t.requester_id, t.ticket_id, t.via_source_rel, t.created_at, c.session_id
+            FROM tickets t
+            LEFT JOIN conversations c ON c.ticket_id = t.ticket_id
+            WHERE t.is_bot_raised AND t.requester_id IS NOT NULL
         """
         + _range_clause("created_at", date_from, date_to, top_params)
         + """
@@ -2308,6 +2310,11 @@ def repeat_guests(
         SELECT requester_id,
                COUNT(*)                                          AS ticket_count,
                array_agg(ticket_id ORDER BY created_at)           AS ticket_ids,
+               -- Aligned index-for-index with ticket_ids (same ORDER BY): a
+               -- guest's Nth ticket links to a conversation exactly when
+               -- session_ids[N] is not null. Most will be -- only tickets
+               -- that carry a TicketID session tag have one at all.
+               array_agg(session_id ORDER BY created_at)          AS session_ids,
                bool_or(via_source_rel = 'follow_up')              AS chased,
                MAX(created_at)                                    AS last_ticket_at
         FROM scoped
@@ -2339,6 +2346,7 @@ def repeat_guests(
                 "requester_id": str(r["requester_id"]),
                 "ticket_count": _i(r["ticket_count"]),
                 "ticket_ids": [str(t) for t in (r["ticket_ids"] or [])],
+                "session_ids": [(str(s) if s else None) for s in (r["session_ids"] or [])],
                 "chasing_older": bool(r["chased"]),
                 "last_ticket_at": r["last_ticket_at"],
             }

@@ -5,6 +5,7 @@
  * The activity chart is the honest one: a NULL day is a day absent from that
  * extract, drawn as a gap, never as zero.
  */
+import { Link } from "react-router-dom";
 import { fmtDate, fmtInt, usePanel, type Callout, type CountItem, type Kpi } from "../lib/api";
 import {
   Async,
@@ -65,6 +66,7 @@ interface RecentTicket {
   inquiry_type: string | null;
   sentiment: string | null;
   is_bot_raised: boolean;
+  session_id: string | null;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -380,7 +382,11 @@ export default function Tickets() {
 
       {/* ------------------------------------------------------------ recent */}
       <SectionRule title="Recent tickets" note="most recent first" />
-      <Panel title="Recent tickets" meta={recent.data?.meta}>
+      <Panel
+        title="Recent tickets"
+        meta={recent.data?.meta}
+        readout="Session links only a handful of tickets to the conversation that raised them — most tickets never carried a TicketID session tag at all. Where one exists, it opens the full transcript and, if the platform derived one, the technical trace behind it."
+      >
         <Async query={recent} skeletonRows={6}>
           {(data) => (
             <DataTable
@@ -394,6 +400,7 @@ export default function Tickets() {
                 "Flow",
                 "Mood",
                 "Bot-raised",
+                "Session",
               ]}
               rows={(data.items ?? []).map((t) => [
                 <span className="mono" key={t.ticket_id}>
@@ -407,6 +414,13 @@ export default function Tickets() {
                 t.inquiry_type,
                 t.sentiment,
                 t.is_bot_raised ? "yes" : "no",
+                t.session_id ? (
+                  <Link className="trace-id" to={`/conversations/${t.session_id}`}>
+                    Open →
+                  </Link>
+                ) : (
+                  "—"
+                ),
               ])}
             />
           )}

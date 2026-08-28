@@ -4,6 +4,7 @@
  * A floor, not a ceiling: repeat contact arriving by email or phone is not in
  * this extract at all, so the caveat is the point of the panel.
  */
+import { Link } from "react-router-dom";
 import { fmtDate, fmtInt, usePanel, type Callout } from "../lib/api";
 import { Async, Callouts, DataTable, Note, PageHead, Panel, SectionRule } from "../components/primitives";
 
@@ -11,6 +12,10 @@ interface TopRepeatGuest {
   requester_id: string;
   ticket_count: number;
   ticket_ids: string[];
+  // Aligned index-for-index with ticket_ids: session_ids[i] is the
+  // conversation that raised ticket_ids[i], or null when that ticket never
+  // carried a TicketID session tag -- true for most tickets here.
+  session_ids: (string | null)[];
   chasing_older: boolean;
   last_ticket_at: string | null;
 }
@@ -147,7 +152,23 @@ export default function Customers() {
                 rows={d.top_repeat_guests.map((g) => [
                   g.requester_id,
                   fmtInt(g.ticket_count),
-                  g.ticket_ids.join(", "),
+                  <span key="tickets">
+                    {g.ticket_ids.map((ticketId, i) => {
+                      const sessionId = g.session_ids[i];
+                      return (
+                        <span key={ticketId}>
+                          {i > 0 ? ", " : ""}
+                          {sessionId ? (
+                            <Link className="trace-id" to={`/conversations/${sessionId}`}>
+                              {ticketId}
+                            </Link>
+                          ) : (
+                            ticketId
+                          )}
+                        </span>
+                      );
+                    })}
+                  </span>,
                   g.chasing_older ? "yes" : "no",
                   g.last_ticket_at ? fmtDate(g.last_ticket_at) : "—",
                 ])}
