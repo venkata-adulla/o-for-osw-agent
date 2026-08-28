@@ -751,17 +751,15 @@ def kpis(view: str | None = None, state: str = "healthy") -> dict[str, Any]:
         items = _live_business_kpis()
         basis = _population_basis("A")
     else:
-        items = _rows(
-            fetch_all(
-                """
-                SELECT code, label, value_text, unit, sub_text, delta_text,
-                       delta_direction, delta_is_good, tone, panel_id, footnote
-                FROM kpi_snapshots
-                WHERE view = %s AND state = %s
-                ORDER BY sort_order, id
-                """,
-                (chosen_view, chosen_state),
-            )
+        items = fetch_all(
+            """
+            SELECT code, label, value_text, unit, sub_text, delta_text,
+                   delta_direction, delta_is_good, tone, panel_id, footnote
+            FROM kpi_snapshots
+            WHERE view = %s AND state = %s
+            ORDER BY sort_order, id
+            """,
+            (chosen_view, chosen_state),
         )
         basis = f"OpenTelemetry signals, last 24 hours · state {chosen_state}"
     return {
@@ -1175,12 +1173,23 @@ def _sample_stage(stages: Sequence[dict[str, Any]]) -> dict[str, Any] | None:
     return stages[0]
 
 
-def _funnel_callouts(stages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+def _funnel_callouts(
+    stages: Sequence[dict[str, Any]],
+    *,
+    biggest_loss_detail: str | None = None,
+    lost_after_ticket_detail: str | None = None,
+) -> list[dict[str, Any]]:
     """The four callout cards, derived from the funnel rather than stored.
 
     Keeping them derived means a reseeded funnel cannot leave a stale callout
     behind. Any callout whose inputs are missing is omitted rather than shown
     as zero.
+
+    ``biggest_loss_detail``/``lost_after_ticket_detail`` override the default
+    text for those two callouts specifically -- used by the hand-reviewed
+    chain (``journey_chain``) to name the real drop-off categories instead of
+    the generic per-stage "why", without changing what the live telemetry
+    funnel (``journey_overview``) shows, since that call leaves them unset.
     """
     if not stages:
         return []
@@ -1208,6 +1217,7 @@ def _funnel_callouts(stages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     if losses:
         worst = max(losses, key=lambda s: s["lost_here"])
         stage_no = worst["stage_no"]
+        detail = biggest_loss_detail if biggest_loss_detail is not None else worst.get("why")
         callouts.append(
             {
                 "code": "BIGGEST_LOSS",
@@ -1215,7 +1225,7 @@ def _funnel_callouts(stages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
                 "value_text": str(worst["lost_here"]),
                 "body": (
                     f"lost between stage {stage_no - 1} and {stage_no}"
-                    + (f" -- {worst['why']}" if worst.get("why") else "")
+                    + (f" -- {detail}" if detail else "")
                 ),
                 "tone": "critical",
             }
@@ -1237,7 +1247,8 @@ def _funnel_callouts(stages: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
                     "code": "LOST_AFTER_TICKET",
                     "label": "Lost after the ticket",
                     "value_text": str(sum(after)),
-                    "body": (
+                    "body": lost_after_ticket_detail
+                    or (
                         "ticket raised but no document reached it -- the guest has "
                         "already been told their request is in hand"
                     ),
@@ -1362,7 +1373,17 @@ def journey_chain() -> dict[str, Any]:
     return {
         "basis": _population_basis("C", "Kore.ai extended session detail"),
         "stages": stages,
-        "callouts": _funnel_callouts(stages),
+        "callouts": _funnel_callouts(
+            stages,
+            biggest_loss_detail=(
+                "Talk to Human, Other/Fallback, Career Opportunities, Product "
+                "information (SearchAI), FAQ's, drop-off during mid conversation"
+            ),
+            lost_after_ticket_detail=(
+                "Missing required values within the flow conversation for the "
+                "enrichment, TTH, Other/Fallback, Career Opportunities"
+            ),
+        ),
         "table": table,
     }
 
