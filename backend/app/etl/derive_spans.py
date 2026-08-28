@@ -269,12 +269,18 @@ def load(result: StageResult) -> None:
                 trace_rows.append(trace_row)
                 span_rows.extend(spans)
 
-            # Owned exclusively by this stage -- scoped delete then insert.
-            # Deleting traces cascades to spans (spans.trace_id ON DELETE CASCADE).
-            # "%%" escapes the literal percent for psycopg's placeholder scanner.
-            cur.execute("DELETE FROM traces WHERE trace_id LIKE 'derived-%%'")
-
+            # Owned exclusively by this stage -- scoped delete then insert, but
+            # ONLY when there is something to replace it with. A run that finds
+            # no raw performance records (no files this host can read -- e.g.
+            # a deployment with no local extract mount) must leave whatever was
+            # derived by an earlier, better-supplied run alone rather than
+            # deleting it and inserting nothing: that would make every derived
+            # trace a countdown timer to the next scheduled run instead of
+            # durable data. Deleting traces cascades to spans (spans.trace_id
+            # ON DELETE CASCADE). "%%" escapes the literal percent for
+            # psycopg's placeholder scanner.
             if trace_rows:
+                cur.execute("DELETE FROM traces WHERE trace_id LIKE 'derived-%%'")
                 cur.executemany(_TRACE_UPSERT, trace_rows)
                 cur.executemany(_SPAN_INSERT, span_rows)
         conn.commit()
