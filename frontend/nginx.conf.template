@@ -14,9 +14,20 @@ server {
     # Backend API. The trailing slashes on both sides matter: they make nginx
     # forward the matched sub-path onto the same sub-path upstream instead of
     # replacing the whole path with the proxy_pass URL.
+    #
+    # `Host: $proxy_host` (the upstream's own host:port, as nginx resolved it
+    # from proxy_pass) rather than `$host` (the browser's original request
+    # host) matters the moment frontend and backend are on two different
+    # origins, e.g. two separate Render services: sending the frontend's own
+    # hostname as Host to the backend makes any host-header-based routing in
+    # front of it (which is exactly how Render's shared edge finds the right
+    # service) 502 instead of reaching it. `proxy_ssl_server_name on` is the
+    # equivalent fix at the TLS layer -- it sends the backend's hostname as
+    # SNI during the handshake, instead of none/the wrong one.
     location /api/ {
         proxy_pass ${BACKEND_ORIGIN}/api/;
-        proxy_set_header Host $host;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -24,7 +35,8 @@ server {
 
     location /health {
         proxy_pass ${BACKEND_ORIGIN}/health;
-        proxy_set_header Host $host;
+        proxy_ssl_server_name on;
+        proxy_set_header Host $proxy_host;
     }
 
     # Single-page app: any other path falls through to index.html so
